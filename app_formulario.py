@@ -1,7 +1,18 @@
 import streamlit as st
 import pandas as pd
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
-import os
+import json
+
+# ==== Conexión a Google Sheets ====
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+credentials = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
+client = gspread.authorize(credentials)
+
+# Abre tu Google Sheet por nombre
+SHEET_NAME = "respuestas_facilitadores"  # Cambia aquí el nombre si tu Sheet se llama diferente
+sheet = client.open(SHEET_NAME).sheet1
 
 # ==== CSS Personalizado ====
 st.markdown("""
@@ -71,35 +82,20 @@ with st.form("formulario_evaluacion"):
 
     enviar = st.form_submit_button("📤 Enviar Evaluación")
 
-# ==== Guardar Datos en CSV ====
+# ==== Guardar Datos en Google Sheets ====
 if enviar:
-    nueva_respuesta = pd.DataFrame({
-        "Fecha de Respuesta": [datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
-        "Nombre de quien llena": [nombre_persona],
-        "Puesto": [puesto_persona],
-        "Delegación": [delegacion],
-        "Facilitador Evaluado": [facilitador],
-        "Fecha del Taller": [fecha_encuesta.strftime("%Y-%m-%d")],
-        "Dominio del Tema": [q1],
-        "Claridad de Exposición": [q2],
-        "Organización de Contenidos": [q3],
-        "Uso de PowerPoint": [q4],
-        "Promoción de Participación": [q5],
-        "Aclaración de Dudas": [q6],
-        "Metodología Empleada": [q7],
-        "Actitud Motivadora": [q8],
-        "Duración Adecuada": [q9],
-        "Cumplimiento de Objetivos": [q10],
-        "Aspecto Positivo": [aspecto_positivo],
-        "Sugerencia de Mejora": [sugerencia_mejora]
-    })
+    nueva_fila = [
+        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        nombre_persona,
+        puesto_persona,
+        delegacion,
+        facilitador,
+        fecha_encuesta.strftime("%Y-%m-%d"),
+        q1, q2, q3, q4, q5, q6, q7, q8, q9, q10,
+        aspecto_positivo,
+        sugerencia_mejora
+    ]
 
-    # Si no existe el archivo, lo crea
-    if not os.path.isfile('respuestas.csv'):
-        nueva_respuesta.to_csv('respuestas.csv', index=False)
-    else:
-        respuestas = pd.read_csv('respuestas.csv')
-        respuestas = pd.concat([respuestas, nueva_respuesta], ignore_index=True)
-        respuestas.to_csv('respuestas.csv', index=False)
+    sheet.append_row(nueva_fila)
+    st.success("✅ Evaluación enviada exitosamente a Google Sheets.")
 
-    st.success("✅ Evaluación enviada exitosamente.")
