@@ -2,16 +2,18 @@ import streamlit as st
 import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from datetime import datetime
 import json
+from datetime import datetime
+import os
 
-# ==== Conexión a Google Sheets ====
+# ==== Leer Credenciales desde Secrets ====
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-credentials = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
+credentials_dict = st.secrets["gcp_service_account"]
+credentials = ServiceAccountCredentials.from_json_keyfile_dict(credentials_dict, scope)
 client = gspread.authorize(credentials)
 
-# Abre tu Google Sheet por nombre
-SHEET_NAME = "respuestas_facilitadores"  # Cambia aquí el nombre si tu Sheet se llama diferente
+# Abre el Google Sheet
+SHEET_NAME = "respuestas_facilitadores"  # Cambia si tu Sheet tiene otro nombre
 sheet = client.open(SHEET_NAME).sheet1
 
 # ==== CSS Personalizado ====
@@ -30,10 +32,6 @@ st.markdown("""
     }
     label {
         color: #B3B3B3;
-    }
-    .stTextInput > div > div > input {
-        background-color: #262730;
-        color: white;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -98,4 +96,3 @@ if enviar:
 
     sheet.append_row(nueva_fila)
     st.success("✅ Evaluación enviada exitosamente a Google Sheets.")
-
