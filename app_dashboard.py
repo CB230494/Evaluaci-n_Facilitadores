@@ -1,9 +1,25 @@
 import streamlit as st
 import pandas as pd
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 import plotly.express as px
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+import json
 
-# ==== Estilo Oscuro =====
+# ==== Conexión a Google Sheets ====
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+credentials_dict = st.secrets["gcp_service_account"]
+credentials = ServiceAccountCredentials.from_json_keyfile_dict(credentials_dict, scope)
+client = gspread.authorize(credentials)
+
+# ==== Configuración inicial ====
+SHEET_NAME = "respuestas_facilitadores"  # Cambia si tu Sheet se llama diferente
+sheet = client.open(SHEET_NAME).sheet1
+
+# ==== Cargar datos del Google Sheet ====
+data = pd.DataFrame(sheet.get_all_records())
+
+# ==== Estilo Streamlit oscuro =====
 st.set_page_config(page_title="Dashboard Evaluación Facilitadores", layout="wide")
 
 st.markdown("""
@@ -25,23 +41,17 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# ==== Título ====
 st.title("📊 Dashboard Evaluación Facilitadores")
 
-# ==== Cargar los datos ====
-try:
-    data = pd.read_csv('respuestas.csv')
-except FileNotFoundError:
-    st.error("❌ No se encontró el archivo respuestas.csv. Llena al menos una evaluación.")
-    st.stop()
-
-# ==== Filtros ====
+# ==== Filtro por Facilitador ====
 facilitadores = ["Todos"] + sorted(data["Facilitador Evaluado"].unique().tolist())
 facilitador_seleccionado = st.selectbox("🔎 Selecciona un Facilitador", facilitadores)
 
 if facilitador_seleccionado != "Todos":
     data = data[data["Facilitador Evaluado"] == facilitador_seleccionado]
 
-# ==== Tabla de Respuestas (editable) ====
+# ==== Tabla editable (con AgGrid) ====
 st.subheader("📝 Respuestas Registradas")
 gb = GridOptionsBuilder.from_dataframe(data)
 gb.configure_selection('multiple', use_checkbox=True)
@@ -52,23 +62,12 @@ grid_response = AgGrid(
     gridOptions=grid_options,
     update_mode=GridUpdateMode.SELECTION_CHANGED,
     theme='dark',
-    height=300,
+    height=350,
     width='100%'
 )
 
-# ==== Botón para eliminar registros seleccionados ====
-if st.button("🗑️ Eliminar Respuestas Seleccionadas"):
-    selected = grid_response["selected_rows"]
-    if selected:
-        selected_indices = [row['_selectedRowNodeInfo']['nodeRowIndex'] for row in selected]
-        data = data.drop(selected_indices)
-        data.to_csv('respuestas.csv', index=False)
-        st.success("✅ Respuestas eliminadas correctamente. Recarga el dashboard.")
-    else:
-        st.warning("⚠️ No seleccionaste ninguna fila para eliminar.")
-
 # ==== Gráficos de Evaluación ====
-st.subheader("📈 Gráficos de Evaluación del Facilitador")
+st.subheader("📈 Análisis de Evaluación")
 
 preguntas = [
     "Dominio del Tema",
@@ -94,10 +93,12 @@ for pregunta in preguntas:
     )
     fig.update_layout(
         xaxis_title=pregunta,
-        yaxis_title="Número de respuestas",
+        yaxis_title="Cantidad de Respuestas",
         plot_bgcolor='rgba(0,0,0,0)',
         paper_bgcolor='rgba(0,0,0,0)',
         font_color="white"
     )
     st.plotly_chart(fig, use_container_width=True)
 
+# ==== Eliminar duplicados (por ahora localmente) ====
+st.warning("⚠️ Por ahora la eliminación de respuestas en Google Sheets no es automática. Puedes gestionar limpieza manualmente.")
