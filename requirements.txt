@@ -2,3 +2,5 @@ streamlit
 pandas
 streamlit-aggrid
 plotly
+gspread
+oauth2client
